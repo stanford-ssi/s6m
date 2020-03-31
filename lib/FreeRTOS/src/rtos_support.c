@@ -65,6 +65,6 @@ uint32_t vGetRunTimeCounterValue(void){
 extern void xPortSysTickHandler( void );
 
 int sysTickHook(){
-  //xPortSysTickHandler();
+  xPortSysTickHandler();
   return 0;
 }
