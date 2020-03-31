@@ -32,12 +32,7 @@ void setup()
   // CRC:                         enabled
 
   //NICE-RF 433
-  int state = lora.begin(433.0F, 7.8, 5, 5, SX126X_SYNC_WORD_PRIVATE, 22, 150.0, 8, 1.8F);
-
-  //Lambda62-9
-  //int state = lora.begin(915.0F, 7.8, 5, 5, SX126X_SYNC_WORD_PRIVATE, 22, 150.0, 8, 0);
-
-  //int state = lora.beginFSK(433.0F, 0.6, 0.0, 4.8, 22, 150.0, 16, 0, 1.8F);
+  int state = lora.begin(433.0F, 7.8, 5, 5, SX126X_SYNC_WORD_PRIVATE, 22, 139.0, 8, 1.8F, false); //also works with true...
 
   if (state == ERR_NONE)
   {
