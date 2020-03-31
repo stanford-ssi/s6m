@@ -57,6 +57,14 @@ int16_t SX1272::beginFSK(float freq, float br, float rxBw, float freqDev, int8_t
   return(state);
 }
 
+void SX1272::reset() {
+  Module::pinMode(_mod->getRst(), OUTPUT);
+  Module::digitalWrite(_mod->getRst(), HIGH);
+  delayMicroseconds(100);
+  Module::digitalWrite(_mod->getRst(), LOW);
+  delay(5);
+}
+
 int16_t SX1272::setFrequency(float freq) {
   // check frequency range
   if((freq < 860.0) || (freq > 1020.0)) {
@@ -298,13 +306,13 @@ int16_t SX1272::setDataShapingOOK(uint8_t sh) {
   // set data shaping
   switch(sh) {
     case 0:
-      state |= _mod->SPIsetRegValue(SX127X_REG_PA_RAMP, SX1272_NO_SHAPING, 4, 3);
+      state |= _mod->SPIsetRegValue(SX127X_REG_OP_MODE, SX1272_NO_SHAPING, 4, 3);
       break;
     case 1:
-      state |= _mod->SPIsetRegValue(SX127X_REG_PA_RAMP, SX1272_OOK_FILTER_BR, 4, 3);
+      state |= _mod->SPIsetRegValue(SX127X_REG_OP_MODE, SX1272_OOK_FILTER_BR, 4, 3);
       break;
     case 2:
-      state |= _mod->SPIsetRegValue(SX127X_REG_PA_RAMP, SX1272_OOK_FILTER_2BR, 4, 3);
+      state |= _mod->SPIsetRegValue(SX127X_REG_OP_MODE, SX1272_OOK_FILTER_2BR, 4, 3);
       break;
     default:
       state = ERR_INVALID_DATA_SHAPING;

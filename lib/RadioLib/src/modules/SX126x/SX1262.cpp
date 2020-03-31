@@ -4,32 +4,26 @@ SX1262::SX1262(Module* mod) : SX126x(mod) {
 
 }
 
-int16_t SX1262::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, int8_t power, float currentLimit, uint16_t preambleLength, float tcxoVoltage) {
+int16_t SX1262::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, int8_t power, float currentLimit, uint16_t preambleLength, float tcxoVoltage, bool useRegulatorLDO) {
   // execute common part
-  int16_t state = SX126x::begin(bw, sf, cr, syncWord, currentLimit, preambleLength, tcxoVoltage);
+  int16_t state = SX126x::begin(bw, sf, cr, syncWord, currentLimit, preambleLength, tcxoVoltage, useRegulatorLDO);
   RADIOLIB_ASSERT(state);
-
-  Serial.println("A");
 
   // configure publicly accessible settings
   state = setFrequency(freq);
   RADIOLIB_ASSERT(state);
 
-  Serial.println("B");
-
   state = setOutputPower(power);
   RADIOLIB_ASSERT(state);
-
-  Serial.println("C");
 
   state = SX126x::fixPaClamping();
 
   return(state);
 }
 
-int16_t SX1262::beginFSK(float freq, float br, float freqDev, float rxBw, int8_t power, float currentLimit, uint16_t preambleLength, float dataShaping, float tcxoVoltage) {
+int16_t SX1262::beginFSK(float freq, float br, float freqDev, float rxBw, int8_t power, float currentLimit, uint16_t preambleLength, float dataShaping, float tcxoVoltage, bool useRegulatorLDO) {
   // execute common part
-  int16_t state = SX126x::beginFSK(br, freqDev, rxBw, currentLimit, preambleLength, dataShaping, tcxoVoltage);
+  int16_t state = SX126x::beginFSK(br, freqDev, rxBw, currentLimit, preambleLength, dataShaping, tcxoVoltage, useRegulatorLDO);
   RADIOLIB_ASSERT(state);
 
   // configure publicly accessible settings
@@ -75,8 +69,6 @@ int16_t SX1262::setFrequency(float freq, bool calibrate) {
     RADIOLIB_ASSERT(state);
   }
 
-  Serial.println("D");
-
   // set frequency
   return(SX126x::setFrequencyRaw(freq));
 }
@@ -92,10 +84,8 @@ int16_t SX1262::setOutputPower(int8_t power) {
   int16_t state = readRegister(SX126X_REG_OCP_CONFIGURATION, &ocp, 1);
   RADIOLIB_ASSERT(state);
 
-  // this function sets the optimal PA settings
-  // and adjusts power based on the PA settings chosen
-  // so that output power matches requested power.
-  state = SX126x::setOptimalHiPowerPaConfig(&power);
+  // set PA config
+  state = SX126x::setPaConfig(0x04, SX126X_PA_CONFIG_SX1262);
   RADIOLIB_ASSERT(state);
 
   // set output power

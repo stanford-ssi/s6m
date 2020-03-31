@@ -4,9 +4,9 @@ SX1268::SX1268(Module* mod) : SX126x(mod) {
 
 }
 
-int16_t SX1268::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, int8_t power, float currentLimit, uint16_t preambleLength, float tcxoVoltage) {
+int16_t SX1268::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, int8_t power, float currentLimit, uint16_t preambleLength, float tcxoVoltage, bool useRegulatorLDO) {
   // execute common part
-  int16_t state = SX126x::begin(bw, sf, cr, syncWord, currentLimit, preambleLength, tcxoVoltage);
+  int16_t state = SX126x::begin(bw, sf, cr, syncWord, currentLimit, preambleLength, tcxoVoltage, useRegulatorLDO);
   RADIOLIB_ASSERT(state);
 
   // configure publicly accessible settings
@@ -20,9 +20,9 @@ int16_t SX1268::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t sync
 
   return(state);
 }
-int16_t SX1268::beginFSK(float freq, float br, float freqDev, float rxBw, int8_t power, float currentLimit, uint16_t preambleLength, float dataShaping, float tcxoVoltage) {
+int16_t SX1268::beginFSK(float freq, float br, float freqDev, float rxBw, int8_t power, float currentLimit, uint16_t preambleLength, float dataShaping, float tcxoVoltage, bool useRegulatorLDO) {
   // execute common part
-  int16_t state = SX126x::beginFSK(br, freqDev, rxBw, currentLimit, preambleLength, dataShaping, tcxoVoltage);
+  int16_t state = SX126x::beginFSK(br, freqDev, rxBw, currentLimit, preambleLength, dataShaping, tcxoVoltage, useRegulatorLDO);
   RADIOLIB_ASSERT(state);
 
   // configure publicly accessible settings
@@ -77,8 +77,8 @@ int16_t SX1268::setOutputPower(int8_t power) {
   int16_t state = readRegister(SX126X_REG_OCP_CONFIGURATION, &ocp, 1);
   RADIOLIB_ASSERT(state);
 
-  // enable optimal PA - this changes the value of power.
-  state = SX126x::setOptimalHiPowerPaConfig(&power);
+  // set PA config
+  state = SX126x::setPaConfig(0x04, SX126X_PA_CONFIG_SX1268);
   RADIOLIB_ASSERT(state);
 
   // set output power

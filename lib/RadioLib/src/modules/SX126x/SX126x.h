@@ -7,9 +7,10 @@
 #include "../../protocols/PhysicalLayer/PhysicalLayer.h"
 
 // SX126X physical layer properties
+#define SX126X_FREQUENCY_STEP_SIZE                    0.9536743164
+#define SX126X_MAX_PACKET_LENGTH                      255
 #define SX126X_CRYSTAL_FREQ                           32.0
 #define SX126X_DIV_EXPONENT                           25
-#define SX126X_MAX_PACKET_LENGTH                      255
 
 // SX126X SPI commands
 // operational modes commands
@@ -369,9 +370,11 @@ class SX126x: public PhysicalLayer {
 
       \param tcxoVoltage TCXO reference voltage to be set on DIO3. Defaults to 1.6 V, set to 0 to skip.
 
+      \param useRegulatorLDO use the LDO instead of DC-DC converter (default false). This is necessary for some modules such as the LAMBDA from RF solutions.
+
       \returns \ref status_codes
     */
-    int16_t begin(float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, float currentLimit, uint16_t preambleLength, float tcxoVoltage);
+    int16_t begin(float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, float currentLimit, uint16_t preambleLength, float tcxoVoltage, bool useRegulatorLDO = false);
 
     /*!
       \brief Initialization method for FSK modem.
@@ -390,9 +393,11 @@ class SX126x: public PhysicalLayer {
 
       \param tcxoVoltage TCXO reference voltage to be set on DIO3. Defaults to 1.6 V, set to 0 to skip.
 
+      \param useRegulatorLDO use the LDO instead of DC-DC converter (default false). This is necessary for some modules such as the LAMBDA from RF solutions.
+
       \returns \ref status_codes
     */
-    int16_t beginFSK(float br, float freqDev, float rxBw, float currentLimit, uint16_t preambleLength, float dataShaping, float tcxoVoltage);
+    int16_t beginFSK(float br, float freqDev, float rxBw, float currentLimit, uint16_t preambleLength, float dataShaping, float tcxoVoltage, bool useRegulatorLDO = false);
 
     /*!
       \brief Reset method. Will reset the chip to the default state using RST pin.
@@ -602,6 +607,13 @@ class SX126x: public PhysicalLayer {
     int16_t setCurrentLimit(float currentLimit);
 
     /*!
+      \brief Reads current protection limit.
+
+      \returns Currently configured overcurrent protection limit in mA.
+    */
+    float getCurrentLimit();
+
+    /*!
       \brief Sets preamble length for LoRa or FSK modem. Allowed values range from 1 to 65535.
 
       \param preambleLength Preamble length to be set in symbols (LoRa) or bits (FSK).
@@ -807,6 +819,30 @@ class SX126x: public PhysicalLayer {
      \returns \ref status_codes
    */
    int16_t explicitHeader();
+
+   /*!
+    \brief Set regulator mode to LDO.
+
+    \returns \ref status_codes
+  */
+   int16_t setRegulatorLDO();
+
+   /*!
+    \brief Set regulator mode to DC-DC.
+
+    \returns \ref status_codes
+  */
+   int16_t setRegulatorDCDC();
+
+   /*!
+     \brief Sets transmission encoding. Available in FSK mode only. Serves only as alias for PhysicalLayer compatibility.
+
+     \param encoding Encoding to be used. Set to 0 for NRZ, and 2 for whitening.
+
+     \returns \ref status_codes
+   */
+   int16_t setEncoding(uint8_t encoding);
+
 #ifndef RADIOLIB_GODMODE
   protected:
 #endif
@@ -831,6 +867,7 @@ class SX126x: public PhysicalLayer {
     int16_t setPacketParams(uint16_t preambleLength, uint8_t crcType, uint8_t payloadLength, uint8_t headerType, uint8_t invertIQ = SX126X_LORA_IQ_STANDARD);
     int16_t setPacketParamsFSK(uint16_t preambleLength, uint8_t crcType, uint8_t syncWordLength, uint8_t addrComp, uint8_t whitening, uint8_t packetType = SX126X_GFSK_PACKET_VARIABLE, uint8_t payloadLength = 0xFF, uint8_t preambleDetectorLength = SX126X_GFSK_PREAMBLE_DETECT_16);
     int16_t setBufferBaseAddress(uint8_t txBaseAddress = 0x00, uint8_t rxBaseAddress = 0x00);
+    int16_t setRegulatorMode(uint8_t mode);
     uint8_t getStatus();
     uint32_t getPacketStatus();
     uint16_t getDeviceErrors();
@@ -838,7 +875,6 @@ class SX126x: public PhysicalLayer {
 
     int16_t startReceiveCommon();
     int16_t setFrequencyRaw(float freq);
-    int16_t setOptimalHiPowerPaConfig(int8_t* inOutPower);
     int16_t setPacketMode(uint8_t mode, uint8_t len);
     int16_t setHeaderType(uint8_t headerType, size_t len = 0xFF);
 
