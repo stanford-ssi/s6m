@@ -6,6 +6,17 @@ TaskHandle_t RadioTask::taskHandle = NULL;
 StaticTask_t RadioTask::xTaskBuffer;
 StackType_t RadioTask::xStack[stackSize];
 
+BinarySemaphore RadioTask::sem;
+
+volatile bool transmittedFlag = false;
+volatile bool enableInterrupt = true;
+int transmissionState = ERR_NONE;
+
+void RadioTask::setFlag(void)
+{
+    sem.giveFromISR();
+}
+
 RadioTask::RadioTask(uint8_t priority)
 {
     RadioTask::taskHandle = xTaskCreateStatic(activity,                 //static function to run
@@ -44,36 +55,33 @@ void RadioTask::activity(void *ptr)
         sys.tasks.logger.log("Radio Init Failed!");
     }
 
+    lora.setDio1Action(setFlag);
+
     TickType_t timer = 0;
     while (true)
     {
         vTaskDelayUntil(&timer, 1000);
-        
+
         digitalWrite(LED_BUILTIN, false);
         vTaskDelayUntil(&timer, 1000);
         digitalWrite(LED_BUILTIN, true);
         sys.tasks.logger.log("Blink!");
 
-        byte byteArr[] = {0x01, 0x23, 0x45, 0x56, 0x78, 0xAB, 0xCD, 0xEF};
-        state = lora.transmit(byteArr, 8);
+        
+        transmissionState = lora.startTransmit("Hello World!Hello World!Hello World!Hello World!Hello World!Hello World!Hello World!Hello World!");
 
-        if (state == ERR_NONE)
+        if (transmissionState == ERR_NONE)
         {
-            sys.tasks.logger.log("Sent!");
-        }
-        else if (state == ERR_PACKET_TOO_LONG)
-        {
-            // the supplied packet was longer than 256 bytes
-            sys.tasks.logger.log("Too Long!");
-        }
-        else if (state == ERR_TX_TIMEOUT)
-        {
-            // timeout occured while transmitting packet
-            sys.tasks.logger.log("timeout!");
+            // packet was successfully sent
+            Serial.println(F("transmission finished!"));
         }
         else
         {
-            sys.tasks.logger.log("failed!");
+            Serial.print(F("failed, code "));
+            Serial.println(transmissionState);
         }
+
+        sem.take(NEVER);
+        
     }
 }
