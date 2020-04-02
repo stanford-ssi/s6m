@@ -6,15 +6,14 @@ TaskHandle_t RadioTask::taskHandle = NULL;
 StaticTask_t RadioTask::xTaskBuffer;
 StackType_t RadioTask::xStack[stackSize];
 
-BinarySemaphore RadioTask::sem;
-
-volatile bool transmittedFlag = false;
-volatile bool enableInterrupt = true;
-int transmissionState = ERR_NONE;
+MsgBuffer<packet_t, 1000> RadioTask::txbuf;
+MsgBuffer<packet_t, 1000> RadioTask::rxbuf;
 
 void RadioTask::setFlag(void)
 {
-    sem.giveFromISR();
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xTaskNotifyFromISR(taskHandle, 0b01, eSetBits, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 RadioTask::RadioTask(uint8_t priority)
@@ -33,9 +32,19 @@ TaskHandle_t RadioTask::getTaskHandle()
     return taskHandle;
 }
 
+void RadioTask::sendPacket(packet_t &packet)
+{
+    txbuf.send(packet);
+    xTaskNotify(taskHandle, 0b10, eSetBits);
+}
+
+void RadioTask::waitForPacket(packet_t &packet)
+{
+    rxbuf.receive(packet, true);
+}
+
 void RadioTask::activity(void *ptr)
 {
-    pinMode(LED_BUILTIN, OUTPUT);
 
     // SX1262 has the following connections:
     // NSS pin:   5
@@ -57,31 +66,47 @@ void RadioTask::activity(void *ptr)
 
     lora.setDio1Action(setFlag);
 
-    TickType_t timer = 0;
+    bool txing = 0; //0=rx 1=tx
+    lora.startReceive();
+
+    packet_t packet;
+
     while (true)
     {
-        vTaskDelayUntil(&timer, 1000);
+        //wait for a notification
+        uint32_t flags;
+        xTaskNotifyWait(0b11, 0, &flags, NEVER);
 
-        digitalWrite(LED_BUILTIN, false);
-        vTaskDelayUntil(&timer, 1000);
-        digitalWrite(LED_BUILTIN, true);
-        sys.tasks.logger.log("Blink!");
-
-        
-        transmissionState = lora.startTransmit("Hello World!Hello World!Hello World!Hello World!Hello World!Hello World!Hello World!Hello World!");
-
-        if (transmissionState == ERR_NONE)
+        if ((flags & 0b01) && !txing) //if were Rxing, and we got an rx_done signal
         {
-            // packet was successfully sent
-            Serial.println(F("transmission finished!"));
+            lora.readData(packet.data, 255);
+            packet.len = lora.getPacketLength();
+            rxbuf.send(packet);
+            //finished receiveing
+        }
+        else if ((flags & 0b10) && txing) //if we were Txing, and we got an queue interupt
+        {
+            continue; //don't interup the TX process, keep waiting.
+        }
+
+        //time to start doing the next thing
+        if (txbuf.empty())
+        {
+            lora.startReceive();
+            txing = false;
         }
         else
         {
-            Serial.print(F("failed, code "));
-            Serial.println(transmissionState);
+            if (txbuf.receive(packet, false))
+            {
+                //should add CAD here
+                lora.startTransmit(packet.data, packet.len);
+                txing = true;
+            }
+            else
+            {
+                //ERROR reading packet from txbuffer
+            }
         }
-
-        sem.take(NEVER);
-        
     }
 }

@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "reset.h": "c"
+        "reset.h": "c",
+        "system_error": "cpp"
     }
 }
