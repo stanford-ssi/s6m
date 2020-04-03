@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include <hal_rtos.h>
 #include <string.h>
 #include "ArduinoJson.h"
@@ -8,16 +7,25 @@
 #include "BinarySemaphore.hpp"
 #include "MsgBuffer.hpp"
 
-struct {
- uint8_t len;
- uint8_t data[255];
+#include "RadioLib.h"
+
+struct
+{
+  uint8_t len;
+  uint8_t data[255];
 } typedef packet_t;
 
+enum state_t
+{
+  TX,
+  Listening,
+  GotPreamble,
+  GotHeader,
+};
 
 class RadioTask
 {
 private:
-
   static const size_t stackSize = 1000;
 
   static TaskHandle_t taskHandle;
@@ -28,13 +36,22 @@ private:
 
   static void setFlag();
 
-  static MsgBuffer<packet_t,1000> txbuf;
-  static MsgBuffer<packet_t,1000> rxbuf;
+  static void processRX(SX1262 &lora);
+
+  static MsgBuffer<packet_t, 1000> txbuf;
+  static MsgBuffer<packet_t, 1000> rxbuf;
+
+  // SX1262 has the following connections:
+  // NSS pin:   5
+  // DIO1 pin:  6
+  // NRST pin:  10
+  // BUSY pin:  9
+
+  static state_t state;
 
 public:
   RadioTask(uint8_t priority);
   TaskHandle_t getTaskHandle();
   void sendPacket(packet_t &packet);
   void waitForPacket(packet_t &packet);
-  
 };
