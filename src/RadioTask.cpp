@@ -125,11 +125,12 @@ void RadioTask::activity(void *ptr)
                     } while (!(flags & 0b01) && !xTaskCheckForTimeOut(&xTimeOut, &xTicksToWait)); //wait repeatedly (up to 500ms from initial start) for an interupt from the radio
 
                     irq = lora.getIrqStatus();
+                    lora.clearIrqStatus();
                     status = lora.getStatus();
 
                     if (irq & SX126X_IRQ_RX_DONE) //packet is ready, we can grab it
                     {
-                        //processRX(lora);
+                        processRX(lora);
                         state = Listening;
                     }
                     else if (irq & SX126X_IRQ_HEADER_VALID) //header is ready, but not packet. We are confident that an RxDone will come, (sucessfully or otherwise)
@@ -146,7 +147,7 @@ void RadioTask::activity(void *ptr)
             {
                 if (irq & SX126X_IRQ_RX_DONE)
                 {
-                    //processRX(lora);
+                    processRX(lora);
                     state = Listening;
                 }
             }

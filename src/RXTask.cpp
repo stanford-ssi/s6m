@@ -31,7 +31,7 @@ void RXTask::activity(void *ptr)
         sys.tasks.radio.waitForPacket(packet);
         i++;
         char str[50];
-        snprintf(str, 50, "Got %s of %lu", (char *)packet.data, i);
+        snprintf(str, 50, "Got %lu of %s", i, (char *)packet.data);
         sys.tasks.logger.log(str);
     }
 }

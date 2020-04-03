@@ -32,7 +32,7 @@ void TestTask::activity(void *ptr)
         i++;
         digitalWrite(LED_BUILTIN, true);
         packet_t packet;
-        snprintf((char *)packet.data, 255, "A:%lu", i);
+        packet.len = snprintf((char *)packet.data, 255, "B:%lu", i) + 1;
         sys.tasks.radio.sendPacket(packet);
         sys.tasks.logger.log("Queued message for transmission!");
         digitalWrite(LED_BUILTIN, false);
