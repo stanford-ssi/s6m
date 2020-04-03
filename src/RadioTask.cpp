@@ -9,12 +9,15 @@ StackType_t RadioTask::xStack[stackSize];
 MsgBuffer<packet_t, 1000> RadioTask::txbuf;
 MsgBuffer<packet_t, 1000> RadioTask::rxbuf;
 
+StaticEventGroup_t RadioTask::evbuf;
+EventGroupHandle_t RadioTask::evgroup;
+
 state_t RadioTask::state = Listening;
 
 void RadioTask::setFlag(void)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    xTaskNotifyFromISR(taskHandle, 0b01, eSetBits, &xHigherPriorityTaskWoken);
+    xEventGroupSetBitsFromISR(evgroup, 0b01, &xHigherPriorityTaskWoken);
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
@@ -27,6 +30,7 @@ RadioTask::RadioTask(uint8_t priority)
                                               priority,                 //priority
                                               RadioTask::xStack,        //stack object
                                               &RadioTask::xTaskBuffer); //TCB object
+    evgroup = xEventGroupCreateStatic(&evbuf);
 }
 
 TaskHandle_t RadioTask::getTaskHandle()
@@ -37,7 +41,7 @@ TaskHandle_t RadioTask::getTaskHandle()
 void RadioTask::sendPacket(packet_t &packet)
 {
     txbuf.send(packet);
-    xTaskNotify(taskHandle, 0b10, eSetBits);
+    xEventGroupSetBits(evgroup, 0b10);
 }
 
 void RadioTask::waitForPacket(packet_t &packet)
@@ -72,7 +76,7 @@ void RadioTask::activity(void *ptr)
     while (true)
     {
         uint32_t flags;
-        xTaskNotifyWait(0b11, 0, &flags, NEVER);
+        flags = xEventGroupWaitBits(evgroup, 0b11, true, false, NEVER);
         //read all
         uint16_t irq = lora.getIrqStatus();
         uint8_t status = lora.getStatus();
@@ -115,18 +119,10 @@ void RadioTask::activity(void *ptr)
                 {
                     state = GotPreamble;
 
-                    TickType_t xTicksToWait = 500;
-                    TimeOut_t xTimeOut;
-
-                    vTaskSetTimeOutState(&xTimeOut);
-                    do
-                    {
-                        xTaskNotifyWait(0b11, 0, &flags, 500);
-                    } while (!(flags & 0b01) && !xTaskCheckForTimeOut(&xTimeOut, &xTicksToWait)); //wait repeatedly (up to 500ms from initial start) for an interupt from the radio
+                    xEventGroupWaitBits(evgroup, 0b01, true, false, 500);
 
                     irq = lora.getIrqStatus();
                     lora.clearIrqStatus();
-                    status = lora.getStatus();
 
                     if (irq & SX126X_IRQ_RX_DONE) //packet is ready, we can grab it
                     {

@@ -8,6 +8,7 @@
 #include "MsgBuffer.hpp"
 
 #include "RadioLib.h"
+#include "event_groups.h"
 
 struct
 {
@@ -40,6 +41,9 @@ private:
 
   static MsgBuffer<packet_t, 1000> txbuf;
   static MsgBuffer<packet_t, 1000> rxbuf;
+
+  static StaticEventGroup_t evbuf;
+  static EventGroupHandle_t evgroup;
 
   // SX1262 has the following connections:
   // NSS pin:   5
