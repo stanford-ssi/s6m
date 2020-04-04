@@ -3,12 +3,11 @@
 #include <hal_rtos.h>
 #include <string.h>
 #include "ArduinoJson.h"
-#include "StrBuffer.hpp"
-#include "BinarySemaphore.hpp"
 #include "MsgBuffer.hpp"
-
-#include "SX1262S.hpp"
 #include "event_groups.h"
+
+#define RADIOLIB_STATIC_ONLY
+#include "SX1262S.hpp"
 
 struct
 {
@@ -43,13 +42,8 @@ private:
   static StaticEventGroup_t evbuf;
   static EventGroupHandle_t evgroup;
 
-  // SX1262 has the following connections:
-  // NSS pin:   5
-  // DIO1 pin:  6
-  // NRST pin:  10
-  // BUSY pin:  9
-
-  static state_t state;
+  static Module mod;
+  static SX1262S lora;
 
 public:
   RadioTask(uint8_t priority);

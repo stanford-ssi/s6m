@@ -12,6 +12,14 @@ MsgBuffer<packet_t, 1000> RadioTask::rxbuf;
 StaticEventGroup_t RadioTask::evbuf;
 EventGroupHandle_t RadioTask::evgroup;
 
+// SX1262 has the following connections:
+// NSS pin:   5
+// DIO1 pin:  6
+// NRST pin:  10
+// BUSY pin:  9
+Module RadioTask::mod(5, 6, 10, 9);
+SX1262S RadioTask::lora(&mod);
+
 void RadioTask::radioISR(void)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -49,8 +57,6 @@ void RadioTask::waitForPacket(packet_t &packet)
 
 void RadioTask::activity(void *ptr)
 {
-    SX1262S lora = new Module(5, 6, 10, 9);
-
     int state = lora.begin(433.0F, 7.8, 5, 5, SX126X_SYNC_WORD_PRIVATE, 22, 139.0, 8, 1.8F, false);
 
     if (state == ERR_NONE)
@@ -73,7 +79,7 @@ void RadioTask::activity(void *ptr)
     {
         uint32_t flags = xEventGroupWaitBits(evgroup, 0b11, true, false, NEVER);
         uint16_t irq = lora.getIrqStatus();
-        logStatus(lora);
+        //logStatus(lora);
         lora.clearIrqStatus();
 
         //RECEIVE BLOCK
