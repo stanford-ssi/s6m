@@ -35,9 +35,7 @@ private:
 
   static void activity(void *p);
 
-  static void setFlag();
-
-  static void processRX(SX1262 &lora);
+  static void radioISR();
 
   static MsgBuffer<packet_t, 1000> txbuf;
   static MsgBuffer<packet_t, 1000> rxbuf;
