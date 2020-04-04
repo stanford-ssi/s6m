@@ -15,14 +15,6 @@ struct
   uint8_t data[255];
 } typedef packet_t;
 
-enum state_t
-{
-  TX,
-  Listening,
-  GotPreamble,
-  GotHeader,
-};
-
 class RadioTask
 {
 private:

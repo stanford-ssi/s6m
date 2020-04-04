@@ -36,6 +36,6 @@ void TestTask::activity(void *ptr)
         sys.tasks.radio.sendPacket(packet);
         sys.tasks.logger.log("Queued message for transmission!");
         digitalWrite(LED_BUILTIN, false);
-        vTaskDelay(rand() % 5000);
+        vTaskDelay(rand() % 2000);
     }
 }

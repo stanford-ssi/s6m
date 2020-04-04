@@ -59,11 +59,7 @@ void RadioTask::activity(void *ptr)
 {
     int state = lora.begin(433.0F, 7.8, 5, 5, SX126X_SYNC_WORD_PRIVATE, 22, 139.0, 8, 1.8F, false);
 
-    if (state == ERR_NONE)
-    {
-        sys.tasks.logger.log("Radio Online!");
-    }
-    else
+    if (state != ERR_NONE)
     {
         sys.tasks.logger.log("Radio Init Failed!");
     }
@@ -85,7 +81,7 @@ void RadioTask::activity(void *ptr)
         //RECEIVE BLOCK
         if (irq & SX126X_IRQ_PREAMBLE_DETECTED)
         {
-            sys.tasks.logger.log("Got Preamble");
+            //sys.tasks.logger.log("Got Preamble");
 
             flags = xEventGroupWaitBits(evgroup, 0b01, true, false, 500); //wait for another radio interupt for 500ms
 
@@ -99,7 +95,7 @@ void RadioTask::activity(void *ptr)
 
             if ((irq & SX126X_IRQ_HEADER_VALID) && !(irq & SX126X_IRQ_RX_DONE)) //header is ready, but not packet. We are confident that an RxDone will come, (sucessfully or otherwise)
             {
-                sys.tasks.logger.log("waiting for RXDone");
+                //sys.tasks.logger.log("waiting for RXDone");
                 flags = xEventGroupWaitBits(evgroup, 0b01, true, false, 5000); //wait for radio interupt for 500ms
 
                 if (!(flags & 0b01))
@@ -114,7 +110,7 @@ void RadioTask::activity(void *ptr)
 
             if (irq & SX126X_IRQ_RX_DONE) //packet is ready, we can grab it
             {
-                sys.tasks.logger.log("Got Packet");
+                //sys.tasks.logger.log("Got Packet");
                 packet_t packet;
                 lora.readData(packet.data, 255);
                 packet.len = lora.getPacketLength();
@@ -130,13 +126,13 @@ void RadioTask::activity(void *ptr)
         //TRANSMIT BLOCK
         if (txbuf.empty())
         {
-            sys.tasks.logger.log("Nothing to send, keep RXing");
+            //sys.tasks.logger.log("Nothing to send, keep RXing");
             lora.startReceive();
             continue;
         }
         else
         {
-            sys.tasks.logger.log("Done RXing, time to TX");
+            //sys.tasks.logger.log("Done RXing, time to TX");
             packet_t packet;
             if (txbuf.receive(packet, false))
             {
@@ -147,7 +143,7 @@ void RadioTask::activity(void *ptr)
 
                 if (irq & SX126X_IRQ_TX_DONE)
                 {
-                    sys.tasks.logger.log("Done TXing, start RXing for at least 50ms");
+                    //sys.tasks.logger.log("Done TXing, start RXing for at least 50ms");
                     lora.startReceive();
                 }
                 else
