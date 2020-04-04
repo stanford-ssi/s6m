@@ -49,7 +49,7 @@ void RadioTask::waitForPacket(packet_t &packet)
 
 void RadioTask::activity(void *ptr)
 {
-    SX1262 lora = new Module(5, 6, 10, 9);
+    SX1262S lora = new Module(5, 6, 10, 9);
 
     int state = lora.begin(433.0F, 7.8, 5, 5, SX126X_SYNC_WORD_PRIVATE, 22, 139.0, 8, 1.8F, false);
 

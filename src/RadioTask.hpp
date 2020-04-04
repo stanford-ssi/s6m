@@ -7,7 +7,7 @@
 #include "BinarySemaphore.hpp"
 #include "MsgBuffer.hpp"
 
-#include "RadioLib.h"
+#include "SX1262S.hpp"
 #include "event_groups.h"
 
 struct
