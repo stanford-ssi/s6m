@@ -73,17 +73,18 @@ void RadioTask::activity(void *ptr)
 
     state = Listening;
 
+    uint32_t flags = 0;
+
     while (true)
     {
-        uint32_t flags;
         flags = xEventGroupWaitBits(evgroup, 0b11, true, false, NEVER);
         //read all
         uint16_t irq = lora.getIrqStatus();
-        uint8_t status = lora.getStatus();
+        //uint8_t status = lora.getStatus();
         //uint8_t chipmode = (status & 0b01110000) >> 4;
         //uint8_t cmdstatus = (status & 0b00001110) >> 1;
-
         logStatus(lora);
+        lora.clearIrqStatus();
 
         if (flags & 0b01) //update from radio
         {
@@ -91,14 +92,57 @@ void RadioTask::activity(void *ptr)
             {
                 if (irq & SX126X_IRQ_TX_DONE)
                 {
+                    sys.tasks.logger.log("Done TXing, start RXing for at least 50ms");
+                    lora.startReceive();
+                    state = Listening;
+                    xEventGroupWaitBits(evgroup, 0b01, false, false, 50); //wait for other radio to get a chance to speak
+                    continue;       //don't start TXing right away
+                }
+            }
+            else if (state == Listening)
+            {
+                if (irq & SX126X_IRQ_PREAMBLE_DETECTED)
+                {
+                    sys.tasks.logger.log("Got Preamble");
+
+                    xEventGroupWaitBits(evgroup, 0b01, true, false, 500); //wait for radio interupt for 500ms
+
+                    irq = lora.getIrqStatus();
+                    lora.clearIrqStatus();
+
+                    if (irq & SX126X_IRQ_RX_DONE) //packet is ready, we can grab it
+                    {
+                        sys.tasks.logger.log("Got Packet");
+                        processRX(lora);
+                        state = Listening;
+                    }
+                    else if (irq & SX126X_IRQ_HEADER_VALID) //header is ready, but not packet. We are confident that an RxDone will come, (sucessfully or otherwise)
+                    {
+                        sys.tasks.logger.log("Got Header");
+                        state = GotHeader;
+                    }
+                    else //we are giving up...
+                    {
+                        state = Listening;
+                    }
+                }
+            }
+            else if (state == GotHeader)
+            {
+                if (irq & SX126X_IRQ_RX_DONE)
+                {
+                    sys.tasks.logger.log("Got Packet 2");
+                    processRX(lora);
                     if (txbuf.empty())
                     {
-                        lora.startReceive();
+                        sys.tasks.logger.log("Done RXing, nothing to send, keep RXing");
                         state = Listening;
+                        lora.startReceive();
+                        continue;
                     }
                     else
                     {
-                        //Keep TXing
+                        sys.tasks.logger.log("Done RXing, time to TX");
                         packet_t packet;
                         if (txbuf.receive(packet, false))
                         {
@@ -113,45 +157,11 @@ void RadioTask::activity(void *ptr)
                     }
                 }
             }
-            else if (state == Listening)
-            {
-                if (irq & SX126X_IRQ_PREAMBLE_DETECTED)
-                {
-                    state = GotPreamble;
-
-                    xEventGroupWaitBits(evgroup, 0b01, true, false, 500);
-
-                    irq = lora.getIrqStatus();
-                    lora.clearIrqStatus();
-
-                    if (irq & SX126X_IRQ_RX_DONE) //packet is ready, we can grab it
-                    {
-                        processRX(lora);
-                        state = Listening;
-                    }
-                    else if (irq & SX126X_IRQ_HEADER_VALID) //header is ready, but not packet. We are confident that an RxDone will come, (sucessfully or otherwise)
-                    {
-                        state = GotHeader;
-                    }
-                    else //we are giving up...
-                    {
-                        state = Listening;
-                    }
-                }
-            }
-            else if (state == GotHeader)
-            {
-                if (irq & SX126X_IRQ_RX_DONE)
-                {
-                    processRX(lora);
-                    state = Listening;
-                }
-            }
         }
 
         if (state == Listening && !txbuf.empty())
         { //Start TXing
-            sys.tasks.logger.log("Txing!");
+            sys.tasks.logger.log("Stop Listening, start transmitting");
             packet_t packet;
             if (txbuf.receive(packet, false))
             {

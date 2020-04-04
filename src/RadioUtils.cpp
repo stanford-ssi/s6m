@@ -21,7 +21,6 @@
 void logStatus(SX1262 &lora)
 {
     uint16_t irq = lora.getIrqStatus();
-    lora.clearIrqStatus();
     uint8_t status = lora.getStatus();
 
     uint8_t chipmode = (status & 0b01110000) >> 4;
