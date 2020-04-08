@@ -15,6 +15,18 @@ struct
   uint8_t data[255];
 } typedef packet_t;
 
+struct
+{
+  float freq = 433.551F;
+  float bw = 10.4F;
+  uint8_t sf = 12;
+  uint8_t cr = 8;
+  uint8_t syncword = SX126X_SYNC_WORD_PRIVATE;
+  int8_t power = 22;
+  float currentLimit = 139.0F;
+  uint8_t preambleLength = 8;
+} typedef radio_settings_t;
+
 class RadioTask
 {
 private:
@@ -28,6 +40,8 @@ private:
 
   static void radioISR();
 
+  static void applySettings(radio_settings_t &settings);
+
   static MsgBuffer<packet_t, 1000> txbuf;
   static MsgBuffer<packet_t, 1000> rxbuf;
 
@@ -37,9 +51,12 @@ private:
   static Module mod;
   static SX1262S lora;
 
+  static MsgBuffer<radio_settings_t, 1000> settingsBuf;
+
 public:
   RadioTask(uint8_t priority);
   TaskHandle_t getTaskHandle();
   void sendPacket(packet_t &packet);
   void waitForPacket(packet_t &packet);
+  void setSettings(radio_settings_t &settings);
 };

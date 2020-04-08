@@ -20,6 +20,8 @@ EventGroupHandle_t RadioTask::evgroup;
 Module RadioTask::mod(5, 6, 10, 9);
 SX1262S RadioTask::lora(&mod);
 
+MsgBuffer<radio_settings_t, 1000> RadioTask::settingsBuf;
+
 void RadioTask::radioISR(void)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -55,9 +57,26 @@ void RadioTask::waitForPacket(packet_t &packet)
     rxbuf.receive(packet, true);
 }
 
+void RadioTask::applySettings(radio_settings_t &settings){
+    lora.setFrequency(settings.freq);
+    lora.setBandwidth(settings.bw);
+    lora.setSpreadingFactor(settings.sf);
+    lora.setCodingRate(settings.cr);
+    lora.setSyncWord(settings.syncword);
+    lora.setOutputPower(settings.power);
+    lora.setCurrentLimit(settings.currentLimit);
+    lora.setPreambleLength(settings.preambleLength);
+    //TODO: Add logging here
+}
+
+void RadioTask::setSettings(radio_settings_t &settings){
+    settingsBuf.send(settings);
+}
+
 void RadioTask::activity(void *ptr)
 {
-    int state = lora.begin(433.0F, 7.8, 5, 5, SX126X_SYNC_WORD_PRIVATE, 22, 139.0, 8, 1.8F, false);
+    radio_settings_t settings; //default settings
+    int state = lora.begin(settings.freq, settings.bw, settings.sf, settings.cr, settings.syncword, settings.power, settings.currentLimit, settings.preambleLength, 1.8F, false);
 
     if (state != ERR_NONE)
     {
@@ -73,6 +92,13 @@ void RadioTask::activity(void *ptr)
 
     while (true)
     {
+        //if new settings are available, apply them
+        if(!settingsBuf.empty()){
+            radio_settings_t settings;
+            settingsBuf.receive(settings,false);
+            applySettings(settings);
+        }
+
         uint32_t flags = xEventGroupWaitBits(evgroup, 0b11, true, false, NEVER);
         uint16_t irq = lora.getIrqStatus();
         //logStatus(lora);
