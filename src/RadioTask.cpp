@@ -6,8 +6,8 @@ TaskHandle_t RadioTask::taskHandle = NULL;
 StaticTask_t RadioTask::xTaskBuffer;
 StackType_t RadioTask::xStack[stackSize];
 
-MsgBuffer<packet_t, 1000> RadioTask::txbuf;
-MsgBuffer<packet_t, 1000> RadioTask::rxbuf;
+MsgBuffer<packet_t, 1050> RadioTask::txbuf;
+MsgBuffer<packet_t, 1050> RadioTask::rxbuf;
 
 StaticEventGroup_t RadioTask::evbuf;
 EventGroupHandle_t RadioTask::evgroup;
@@ -46,10 +46,11 @@ TaskHandle_t RadioTask::getTaskHandle()
     return taskHandle;
 }
 
-void RadioTask::sendPacket(packet_t &packet)
+bool RadioTask::sendPacket(packet_t &packet)
 {
-    txbuf.send(packet); //this puts the packet in the buffer
+    bool ret = txbuf.send(packet); //this puts the packet in the buffer
     xEventGroupSetBits(evgroup, 0b10); //this notifies the task there might be new data to send
+    return ret;
 }
 
 void RadioTask::waitForPacket(packet_t &packet)
@@ -162,8 +163,11 @@ void RadioTask::activity(void *ptr)
             packet_t packet;
             if (txbuf.receive(packet, false))
             {
+                uint32_t time = lora.getTimeOnAir(packet.len) / 1000; //get TOA in ms
+                time = (time*1.1)+100; //add margin
+
                 lora.startTransmit(packet.data, packet.len);
-                flags = xEventGroupWaitBits(evgroup, 0b01, true, false, 500);
+                flags = xEventGroupWaitBits(evgroup, 0b01, true, false, time);
                 irq = lora.getIrqStatus();
                 lora.clearIrqStatus();
 
@@ -176,7 +180,7 @@ void RadioTask::activity(void *ptr)
                 {
                     sys.tasks.logger.log("Expecting TxDone, but no beans.");
                 }
-                xEventGroupWaitBits(evgroup, 0b01, false, false, 50); //wait for other radio to get a chance to speak
+                xEventGroupWaitBits(evgroup, 0b01, false, false, 500); //wait for other radio to get a chance to speak
             }
             else
             {

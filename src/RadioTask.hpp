@@ -42,8 +42,8 @@ private:
 
   static void applySettings(radio_settings_t &settings);
 
-  static MsgBuffer<packet_t, 1000> txbuf;
-  static MsgBuffer<packet_t, 1000> rxbuf;
+  static MsgBuffer<packet_t, 1050> txbuf;
+  static MsgBuffer<packet_t, 1050> rxbuf;
 
   static StaticEventGroup_t evbuf;
   static EventGroupHandle_t evgroup;
@@ -56,7 +56,7 @@ private:
 public:
   RadioTask(uint8_t priority);
   TaskHandle_t getTaskHandle();
-  void sendPacket(packet_t &packet);
+  bool sendPacket(packet_t &packet);
   void waitForPacket(packet_t &packet);
   void setSettings(radio_settings_t &settings);
 };

@@ -33,8 +33,11 @@ void TestTask::activity(void *ptr)
         digitalWrite(LED_BUILTIN, true);
         packet_t packet;
         packet.len = snprintf((char *)packet.data, 255, "B:%lu", i) + 1;
-        sys.tasks.radio.sendPacket(packet);
-        sys.tasks.logger.log("Queued message for transmission!");
+        if(sys.tasks.radio.sendPacket(packet)){
+            sys.tasks.logger.log("Queued message for transmission!");
+        }else{
+            sys.tasks.logger.log("TX Queue is full!");
+        }
         digitalWrite(LED_BUILTIN, false);
         vTaskDelay(rand() % 2000);
     }
