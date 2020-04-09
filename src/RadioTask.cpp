@@ -202,7 +202,7 @@ void RadioTask::activity(void *ptr)
                     sys.tasks.logger.log("Expecting TxDone, but no beans.");
                 }
 
-                time = lora.symbolToMs(16);                           //this can be tuned
+                time = lora.symbolToMs(32);                             //this can be tuned
                 xEventGroupWaitBits(evgroup, 0b01, false, false, time); //wait for other radio to get a chance to speak
             }
             else
