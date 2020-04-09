@@ -15,4 +15,5 @@ public:
     int16_t startTransmit(uint8_t* data, size_t len, uint8_t addr = 0);
     int16_t startReceiveCommon();
     int16_t startReceive(uint32_t timeout = SX126X_RX_TIMEOUT_INF);
+    uint32_t symbolToMs(uint32_t symbols);
 };

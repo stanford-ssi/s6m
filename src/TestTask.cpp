@@ -27,18 +27,20 @@ void TestTask::activity(void *ptr)
     pinMode(LED_BUILTIN, OUTPUT);
 
     uint32_t i = 0;
+    packet_t packet;
+    bool led = false;
+    packet.len = snprintf((char *)packet.data, 255, "B:%lu", i) + 1;
     while (true)
     {
-        i++;
-        digitalWrite(LED_BUILTIN, true);
-        packet_t packet;
-        packet.len = snprintf((char *)packet.data, 255, "B:%lu", i) + 1;
         if(sys.tasks.radio.sendPacket(packet)){
             sys.tasks.logger.log("Queued message for transmission!");
+            i++;
+            packet.len = snprintf((char *)packet.data, 255, "B:%lu", i) + 1;
+            led = !led;
+            digitalWrite(LED_BUILTIN, led);
         }else{
-            sys.tasks.logger.log("TX Queue is full!");
+            vTaskDelay(100);
         }
-        digitalWrite(LED_BUILTIN, false);
-        vTaskDelay(rand() % 2000);
+        
     }
 }

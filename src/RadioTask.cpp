@@ -48,7 +48,7 @@ TaskHandle_t RadioTask::getTaskHandle()
 
 bool RadioTask::sendPacket(packet_t &packet)
 {
-    bool ret = txbuf.send(packet); //this puts the packet in the buffer
+    bool ret = txbuf.send(packet);     //this puts the packet in the buffer
     xEventGroupSetBits(evgroup, 0b10); //this notifies the task there might be new data to send
     return ret;
 }
@@ -58,7 +58,8 @@ void RadioTask::waitForPacket(packet_t &packet)
     rxbuf.receive(packet, true);
 }
 
-void RadioTask::applySettings(radio_settings_t &settings){
+void RadioTask::applySettings(radio_settings_t &settings)
+{
     lora.setFrequency(settings.freq);
     lora.setBandwidth(settings.bw);
     lora.setSpreadingFactor(settings.sf);
@@ -70,7 +71,8 @@ void RadioTask::applySettings(radio_settings_t &settings){
     //TODO: Add logging here
 }
 
-void RadioTask::setSettings(radio_settings_t &settings){
+void RadioTask::setSettings(radio_settings_t &settings)
+{
     settingsBuf.send(settings);
 }
 
@@ -86,17 +88,18 @@ void RadioTask::activity(void *ptr)
 
     lora.setDio1Action(radioISR);
 
-    lora.setDioIrqParams(SX126X_IRQ_TX_DONE | SX126X_IRQ_RX_DONE | SX126X_IRQ_PREAMBLE_DETECTED | SX126X_IRQ_HEADER_VALID | SX126X_IRQ_HEADER_ERR | SX126X_IRQ_CRC_ERR | SX126X_IRQ_TIMEOUT,
-                         SX126X_IRQ_TX_DONE | SX126X_IRQ_RX_DONE | SX126X_IRQ_PREAMBLE_DETECTED | SX126X_IRQ_HEADER_VALID | SX126X_IRQ_HEADER_ERR | SX126X_IRQ_CRC_ERR | SX126X_IRQ_TIMEOUT);
+    lora.setDioIrqParams(SX126X_IRQ_TX_DONE | SX126X_IRQ_RX_DONE | SX126X_IRQ_PREAMBLE_DETECTED | SX126X_IRQ_HEADER_VALID | SX126X_IRQ_HEADER_ERR | SX126X_IRQ_CRC_ERR | SX126X_IRQ_TIMEOUT | SX126X_IRQ_CAD_DETECTED | SX126X_IRQ_CAD_DONE,
+                         SX126X_IRQ_TX_DONE | SX126X_IRQ_RX_DONE | SX126X_IRQ_PREAMBLE_DETECTED | SX126X_IRQ_HEADER_VALID | SX126X_IRQ_HEADER_ERR | SX126X_IRQ_CRC_ERR | SX126X_IRQ_TIMEOUT | SX126X_IRQ_CAD_DETECTED | SX126X_IRQ_CAD_DONE);
 
     lora.startReceive();
 
     while (true)
     {
         //if new settings are available, apply them
-        if(!settingsBuf.empty()){
+        if (!settingsBuf.empty())
+        {
             radio_settings_t settings;
-            settingsBuf.receive(settings,false);
+            settingsBuf.receive(settings, false);
             applySettings(settings);
         }
 
@@ -109,11 +112,13 @@ void RadioTask::activity(void *ptr)
         if (irq & SX126X_IRQ_PREAMBLE_DETECTED)
         {
             //sys.tasks.logger.log("Got Preamble");
+            uint32_t time = lora.symbolToMs(32); //time of a packet header
 
-            flags = xEventGroupWaitBits(evgroup, 0b01, true, false, 500); //wait for another radio interupt for 500ms
+            flags = xEventGroupWaitBits(evgroup, 0b01, true, false, time); //wait for another radio interupt for 500ms
 
             if (!(flags & 0b01))
             {
+                sys.tasks.logger.log("No Header after waiting 32 symbols");
                 continue; //it failed
             }
 
@@ -123,7 +128,8 @@ void RadioTask::activity(void *ptr)
             if ((irq & SX126X_IRQ_HEADER_VALID) && !(irq & SX126X_IRQ_RX_DONE)) //header is ready, but not packet. We are confident that an RxDone will come, (sucessfully or otherwise)
             {
                 //sys.tasks.logger.log("waiting for RXDone");
-                flags = xEventGroupWaitBits(evgroup, 0b01, true, false, 5000); //wait for radio interupt for 500ms
+                uint32_t time = lora.getTimeOnAir(255) / 1000;                 //TODO: read this out of the header to make timeout tighter
+                flags = xEventGroupWaitBits(evgroup, 0b01, true, false, time); //wait for radio interupt for 500ms
 
                 if (!(flags & 0b01))
                 {
@@ -160,11 +166,26 @@ void RadioTask::activity(void *ptr)
         else
         {
             //sys.tasks.logger.log("Done RXing, time to TX");
+
+            do
+            {
+                //sys.tasks.logger.log("Listening for quiet");
+                lora.standby();
+                lora.setCad();
+                uint32_t time = lora.symbolToMs(12) + 50;
+                xEventGroupWaitBits(evgroup, 0b01, true, false, time);
+                irq = lora.getIrqStatus();
+                lora.clearIrqStatus();
+            } while (!(irq & SX126X_IRQ_CAD_DONE) || irq & SX126X_IRQ_CAD_DETECTED);
+
+            //sys.tasks.logger.log("Heard quiet!");
+
             packet_t packet;
             if (txbuf.receive(packet, false))
             {
+
                 uint32_t time = lora.getTimeOnAir(packet.len) / 1000; //get TOA in ms
-                time = (time*1.1)+100; //add margin
+                time = (time * 1.1) + 100;                            //add margin
 
                 lora.startTransmit(packet.data, packet.len);
                 flags = xEventGroupWaitBits(evgroup, 0b01, true, false, time);
@@ -173,14 +194,16 @@ void RadioTask::activity(void *ptr)
 
                 if (irq & SX126X_IRQ_TX_DONE)
                 {
-                    //sys.tasks.logger.log("Done TXing, start RXing for at least 50ms");
+                    //sys.tasks.logger.log("Done TXing, start RXing for at least 16 symbols");
                     lora.startReceive();
                 }
                 else
                 {
                     sys.tasks.logger.log("Expecting TxDone, but no beans.");
                 }
-                xEventGroupWaitBits(evgroup, 0b01, false, false, 500); //wait for other radio to get a chance to speak
+
+                time = lora.symbolToMs(16);                           //this can be tuned
+                xEventGroupWaitBits(evgroup, 0b01, false, false, time); //wait for other radio to get a chance to speak
             }
             else
             {

@@ -103,3 +103,9 @@ int16_t SX1262S::startReceive(uint32_t timeout) {
 
   return(state);
 }
+
+uint32_t SX1262S::symbolToMs(uint32_t symbols)
+{
+  uint32_t symbolLength_us = ((uint32_t)(1000 * 10) << _sf) / (_bwKhz * 10);
+  return symbols * symbolLength_us / 1000;
+}
