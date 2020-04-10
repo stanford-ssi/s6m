@@ -63,6 +63,13 @@ void RadioTask::setSettings(radio_settings_t &settings)
     settingsBuf.send(settings);
 }
 
+radio_settings_t RadioTask::getSettings(){
+    settingsMx.take(NEVER);
+    radio_settings_t temp = settings;
+    settingsMx.give();
+    return temp;
+}
+
 void RadioTask::activity()
 {
     int state = lora.begin(settings.freq, settings.bw, settings.sf, settings.cr, settings.syncword, settings.power, settings.currentLimit, settings.preambleLength, 1.8F, false);
@@ -86,8 +93,10 @@ void RadioTask::activity()
         //if new settings are available, apply them
         if (!settingsBuf.empty())
         {
+            settingsMx.take(NEVER);
             settingsBuf.receive(settings, false);
             applySettings(settings);
+            settingsMx.give();
         }
 
         if (xTaskGetTickCount() - time > 15000)

@@ -6,6 +6,7 @@
 #include "MsgBuffer.hpp"
 #include "event_groups.h"
 #include "LoggerTask.hpp"
+#include "Mutex.hpp"
 
 #define RADIOLIB_STATIC_ONLY
 #include "SX1262S.hpp"
@@ -68,7 +69,9 @@ private:
   void log(log_type t, const char *msg);
   void logPacket(const char *msg, packet_t &packet);
 
+  radio_settings_t getSettings();
   radio_settings_t settings;
+  Mutex settingsMx;
 
   void logStats();
 
