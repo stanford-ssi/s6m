@@ -90,8 +90,10 @@ void RadioTask::activity()
             applySettings(settings);
         }
 
-        if(xTaskGetTickCount() - time > 15000){
+        if (xTaskGetTickCount() - time > 15000)
+        {
             logStats();
+            time = xTaskGetTickCount();
         }
 
         uint32_t flags = xEventGroupWaitBits(evgroup, 0b11, true, false, NEVER);
@@ -140,7 +142,7 @@ void RadioTask::activity()
                 lora.readData(packet.data, 255);
                 packet.len = lora.getPacketLength();
                 rxbuf.send(packet);
-                logPacket("RX",packet);
+                logPacket("RX", packet);
                 rx_success_counter++;
             }
             else
@@ -213,7 +215,7 @@ void RadioTask::activity()
 
 void RadioTask::log(log_type t, const char *msg)
 {
-    if (t & log_mask)
+    if (t & settings.log_mask)
     {
         StaticJsonDocument<1000> doc;
         doc["id"] = pcTaskGetName(taskHandle);
@@ -226,7 +228,7 @@ void RadioTask::log(log_type t, const char *msg)
 
 void RadioTask::logPacket(const char *msg, packet_t &packet)
 {
-    if (log_mask & data)
+    if (settings.log_mask & data)
     {
         StaticJsonDocument<1000> doc;
         doc["id"] = pcTaskGetName(taskHandle);
@@ -241,20 +243,24 @@ void RadioTask::logPacket(const char *msg, packet_t &packet)
     }
 }
 
-void RadioTask::logStats(){
-    StaticJsonDocument<1000> doc;
-    doc["id"] = pcTaskGetName(taskHandle);
-    doc["msg"] = "stats";
-    doc["level"] = (uint8_t)stats;
-    doc["tick"] = xTaskGetTickCount();
-    doc["rx_success"] = rx_success_counter;
-    doc["rx_failure"] = rx_failure_counter;
-    doc["tx_success"] = tx_success_counter;
-    doc["tx_failure"] = tx_failure_counter;
-    doc["freq"] = settings.freq;
-    doc["bw"] = settings.bw;
-    doc["sf"] = settings.sf;
-    doc["cr"] = settings.cr;
-    doc["pwr"] = settings.power;
-    sys.tasks.logger.log(doc);
+void RadioTask::logStats()
+{
+    if (settings.log_mask & stats)
+    {
+        StaticJsonDocument<1000> doc;
+        doc["id"] = pcTaskGetName(taskHandle);
+        doc["msg"] = "stats";
+        doc["level"] = (uint8_t)stats;
+        doc["tick"] = xTaskGetTickCount();
+        doc["rx_success"] = rx_success_counter;
+        doc["rx_failure"] = rx_failure_counter;
+        doc["tx_success"] = tx_success_counter;
+        doc["tx_failure"] = tx_failure_counter;
+        doc["freq"] = settings.freq;
+        doc["bw"] = settings.bw;
+        doc["sf"] = settings.sf;
+        doc["cr"] = settings.cr;
+        doc["pwr"] = settings.power;
+        sys.tasks.logger.log(doc);
+    }
 }

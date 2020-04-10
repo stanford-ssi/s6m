@@ -26,6 +26,7 @@ struct
   int8_t power = 22;
   float currentLimit = 139.0F;
   uint8_t preambleLength = 8;
+  uint8_t log_mask = fatal | error | warning | stats | data | info;
 } typedef radio_settings_t;
 
 class RadioTask
@@ -66,8 +67,6 @@ private:
 
   void log(log_type t, const char *msg);
   void logPacket(const char *msg, packet_t &packet);
-
-  uint8_t log_mask = fatal | error | warning | stats | data | info;
 
   radio_settings_t settings;
 
