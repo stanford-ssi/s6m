@@ -62,7 +62,8 @@ void RadioTask::setSettings(radio_settings_t &settings)
     settingsBuf.send(settings);
 }
 
-radio_settings_t RadioTask::getSettings(){
+radio_settings_t RadioTask::getSettings()
+{
     settingsMx.take(NEVER);
     radio_settings_t temp = settings;
     settingsMx.give();
@@ -111,7 +112,7 @@ void RadioTask::activity()
         //RECEIVE BLOCK
         if (irq & SX126X_IRQ_PREAMBLE_DETECTED)
         {
-            log(warning, "Preamble");
+            log(info, "Preamble");
             uint32_t time = lora.symbolToMs(32); //time of a packet header
 
             flags = xEventGroupWaitBits(evgroup, 0b01, true, false, time); //wait for another radio interupt for 500ms
@@ -191,8 +192,8 @@ void RadioTask::activity()
                 uint32_t time = lora.getTimeOnAir(packet.len) / 1000; //get TOA in ms
                 time = (time * 1.1) + 100;                            //add margin
 
-                lora.startTransmit(packet.data, packet.len);
                 logPacket("TX", packet);
+                lora.startTransmit(packet.data, packet.len);
                 flags = xEventGroupWaitBits(evgroup, 0b01, true, false, time);
                 irq = lora.getIrqStatus();
                 lora.clearIrqStatus();
