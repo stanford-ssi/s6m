@@ -55,7 +55,6 @@ void RadioTask::applySettings(radio_settings_t &settings)
     lora.setOutputPower(settings.power);
     lora.setCurrentLimit(settings.currentLimit);
     lora.setPreambleLength(settings.preambleLength);
-    //TODO: Add logging here
 }
 
 void RadioTask::setSettings(radio_settings_t &settings)
@@ -201,7 +200,6 @@ void RadioTask::activity()
                 if (irq & SX126X_IRQ_TX_DONE)
                 {
                     log(info, "TXDone");
-                    lora.startReceive();
                     tx_success_counter++;
                 }
                 else
@@ -210,6 +208,7 @@ void RadioTask::activity()
                     tx_failure_counter++;
                 }
 
+                lora.startReceive();
                 time = lora.symbolToMs(32);                             //this can be tuned
                 xEventGroupWaitBits(evgroup, 0b01, false, false, time); //wait for other radio to get a chance to speak
             }
