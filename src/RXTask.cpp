@@ -8,8 +8,8 @@ StackType_t RXTask::xStack[stackSize];
 
 RXTask::RXTask(uint8_t priority)
 {
-    RXTask::taskHandle = xTaskCreateStatic(activity,              //static function to run
-                                           "Test",                //task name
+    RXTask::taskHandle = xTaskCreateStatic(activity_wrapper,              //static function to run
+                                           "rx",                //task name
                                            stackSize,             //stack depth (words!)
                                            NULL,                  //parameters
                                            priority,              //priority
@@ -22,7 +22,12 @@ TaskHandle_t RXTask::getTaskHandle()
     return taskHandle;
 }
 
-void RXTask::activity(void *ptr)
+void RXTask::activity_wrapper(void *ptr){
+    sys.tasks.rx.activity();
+}
+
+
+void RXTask::activity()
 {
     uint32_t i = 0;
     while (true)
@@ -32,6 +37,19 @@ void RXTask::activity(void *ptr)
         i++;
         char str[50];
         snprintf(str, 50, "Got %lu of %s", i, (char *)packet.data);
-        sys.tasks.logger.log(str);
+        log(info,str);
+    }
+}
+
+void RXTask::log(log_type t, const char *msg)
+{
+    if (t & log_mask)
+    {
+        StaticJsonDocument<1000> doc;
+        doc["id"] = pcTaskGetName(taskHandle);
+        doc["msg"] = msg;
+        doc["level"] = (uint8_t)t;
+        doc["tick"] = xTaskGetTickCount();
+        sys.tasks.logger.log(doc);
     }
 }

@@ -6,7 +6,7 @@ class System;
 
 #include "LoggerTask.hpp"
 #include "RadioTask.hpp"
-#include "TestTask.hpp"
+#include "TXTask.hpp"
 #include "RXTask.hpp"
 
 class System
@@ -17,7 +17,7 @@ public:
     public:
         LoggerTask logger = LoggerTask(5); //logs to USB/SD
         RadioTask radio = RadioTask(2);    //controls radio
-        TestTask test = TestTask(3);       //test
+        TXTask test = TXTask(3);       //test
         RXTask rx = RXTask(4);
     };
 

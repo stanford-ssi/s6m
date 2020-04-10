@@ -1,38 +1,25 @@
 #include "RadioTask.hpp"
 #include "RadioUtils.hpp"
 #include "main.hpp"
+#include <rBase64.h>
 
 TaskHandle_t RadioTask::taskHandle = NULL;
 StaticTask_t RadioTask::xTaskBuffer;
 StackType_t RadioTask::xStack[stackSize];
 
-MsgBuffer<packet_t, 1050> RadioTask::txbuf;
-MsgBuffer<packet_t, 1050> RadioTask::rxbuf;
-
-StaticEventGroup_t RadioTask::evbuf;
-EventGroupHandle_t RadioTask::evgroup;
-
-// SX1262 has the following connections:
-// NSS pin:   5
-// DIO1 pin:  6
-// NRST pin:  10
-// BUSY pin:  9
-Module RadioTask::mod(5, 6, 10, 9);
-SX1262S RadioTask::lora(&mod);
-
-MsgBuffer<radio_settings_t, 1000> RadioTask::settingsBuf;
-
 void RadioTask::radioISR(void)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    xEventGroupSetBitsFromISR(evgroup, 0b01, &xHigherPriorityTaskWoken);
+    xEventGroupSetBitsFromISR(sys.tasks.radio.evgroup, 0b01, &xHigherPriorityTaskWoken);
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
+void RadioTask::activity_wrapper(void *p) { sys.tasks.radio.activity(); };
+
 RadioTask::RadioTask(uint8_t priority)
 {
-    RadioTask::taskHandle = xTaskCreateStatic(activity,                 //static function to run
-                                              "Radio",                  //task name
+    RadioTask::taskHandle = xTaskCreateStatic(activity_wrapper,         //static function to run
+                                              "radio",                  //task name
                                               stackSize,                //stack depth (words!)
                                               NULL,                     //parameters
                                               priority,                 //priority
@@ -76,9 +63,8 @@ void RadioTask::setSettings(radio_settings_t &settings)
     settingsBuf.send(settings);
 }
 
-void RadioTask::activity(void *ptr)
+void RadioTask::activity()
 {
-    radio_settings_t settings; //default settings
     int state = lora.begin(settings.freq, settings.bw, settings.sf, settings.cr, settings.syncword, settings.power, settings.currentLimit, settings.preambleLength, 1.8F, false);
 
     if (state != ERR_NONE)
@@ -93,32 +79,37 @@ void RadioTask::activity(void *ptr)
 
     lora.startReceive();
 
+    uint32_t time = xTaskGetTickCount();
+
     while (true)
     {
         //if new settings are available, apply them
         if (!settingsBuf.empty())
         {
-            radio_settings_t settings;
             settingsBuf.receive(settings, false);
             applySettings(settings);
         }
 
+        if(xTaskGetTickCount() - time > 15000){
+            logStats();
+        }
+
         uint32_t flags = xEventGroupWaitBits(evgroup, 0b11, true, false, NEVER);
         uint16_t irq = lora.getIrqStatus();
-        //logStatus(lora);
         lora.clearIrqStatus();
 
         //RECEIVE BLOCK
         if (irq & SX126X_IRQ_PREAMBLE_DETECTED)
         {
-            //sys.tasks.logger.log("Got Preamble");
+            log(warning, "Preamble");
             uint32_t time = lora.symbolToMs(32); //time of a packet header
 
             flags = xEventGroupWaitBits(evgroup, 0b01, true, false, time); //wait for another radio interupt for 500ms
 
             if (!(flags & 0b01))
             {
-                sys.tasks.logger.log("No Header after waiting 32 symbols");
+                log(warning, "Missed Header");
+                rx_failure_counter++;
                 continue; //it failed
             }
 
@@ -127,13 +118,14 @@ void RadioTask::activity(void *ptr)
 
             if ((irq & SX126X_IRQ_HEADER_VALID) && !(irq & SX126X_IRQ_RX_DONE)) //header is ready, but not packet. We are confident that an RxDone will come, (sucessfully or otherwise)
             {
-                //sys.tasks.logger.log("waiting for RXDone");
+                log(info, "wait RxDone");
                 uint32_t time = lora.getTimeOnAir(255) / 1000;                 //TODO: read this out of the header to make timeout tighter
                 flags = xEventGroupWaitBits(evgroup, 0b01, true, false, time); //wait for radio interupt for 500ms
 
                 if (!(flags & 0b01))
                 {
-                    sys.tasks.logger.log("waited for RxDone, it never came!");
+                    log(warning, "Missed RxDone");
+                    rx_failure_counter++;
                     continue; //it failed
                 }
 
@@ -143,15 +135,18 @@ void RadioTask::activity(void *ptr)
 
             if (irq & SX126X_IRQ_RX_DONE) //packet is ready, we can grab it
             {
-                //sys.tasks.logger.log("Got Packet");
+                log(info, "RxDone");
                 packet_t packet;
                 lora.readData(packet.data, 255);
                 packet.len = lora.getPacketLength();
                 rxbuf.send(packet);
+                logPacket("RX",packet);
+                rx_success_counter++;
             }
             else
             {
-                sys.tasks.logger.log("Expecting RxDone, but no beans.");
+                log(warning, "Missed RxDone");
+                rx_failure_counter++;
                 continue;
             }
         }
@@ -159,17 +154,16 @@ void RadioTask::activity(void *ptr)
         //TRANSMIT BLOCK
         if (txbuf.empty())
         {
-            //sys.tasks.logger.log("Nothing to send, keep RXing");
+            log(info, "keep RXing");
             lora.startReceive();
             continue;
         }
         else
         {
-            //sys.tasks.logger.log("Done RXing, time to TX");
-
+            log(info, "Time to TX");
             do
             {
-                //sys.tasks.logger.log("Listening for quiet");
+                log(info, "Wait quiet");
                 lora.standby();
                 lora.setCad();
                 uint32_t time = lora.symbolToMs(12) + 50;
@@ -178,7 +172,7 @@ void RadioTask::activity(void *ptr)
                 lora.clearIrqStatus();
             } while (!(irq & SX126X_IRQ_CAD_DONE) || irq & SX126X_IRQ_CAD_DETECTED);
 
-            //sys.tasks.logger.log("Heard quiet!");
+            log(info, "Heard quiet");
 
             packet_t packet;
             if (txbuf.receive(packet, false))
@@ -188,18 +182,21 @@ void RadioTask::activity(void *ptr)
                 time = (time * 1.1) + 100;                            //add margin
 
                 lora.startTransmit(packet.data, packet.len);
+                logPacket("TX", packet);
                 flags = xEventGroupWaitBits(evgroup, 0b01, true, false, time);
                 irq = lora.getIrqStatus();
                 lora.clearIrqStatus();
 
                 if (irq & SX126X_IRQ_TX_DONE)
                 {
-                    //sys.tasks.logger.log("Done TXing, start RXing for at least 16 symbols");
+                    log(info, "TXDone");
                     lora.startReceive();
+                    tx_success_counter++;
                 }
                 else
                 {
-                    sys.tasks.logger.log("Expecting TxDone, but no beans.");
+                    log(warning, "Missed TXDone");
+                    tx_failure_counter++;
                 }
 
                 time = lora.symbolToMs(32);                             //this can be tuned
@@ -207,9 +204,57 @@ void RadioTask::activity(void *ptr)
             }
             else
             {
-                //ERROR reading packet from txbuffer
-                sys.tasks.logger.log("Error Queueing Packet");
+                log(warning, "TX Queue Failure");
+                tx_failure_counter++;
             }
         }
     }
+}
+
+void RadioTask::log(log_type t, const char *msg)
+{
+    if (t & log_mask)
+    {
+        StaticJsonDocument<1000> doc;
+        doc["id"] = pcTaskGetName(taskHandle);
+        doc["msg"] = msg;
+        doc["level"] = (uint8_t)t;
+        doc["tick"] = xTaskGetTickCount();
+        sys.tasks.logger.log(doc);
+    }
+}
+
+void RadioTask::logPacket(const char *msg, packet_t &packet)
+{
+    if (log_mask & data)
+    {
+        StaticJsonDocument<1000> doc;
+        doc["id"] = pcTaskGetName(taskHandle);
+        doc["msg"] = msg;
+        doc["level"] = (uint8_t)data;
+        doc["tick"] = xTaskGetTickCount();
+        doc["len"] = packet.len;
+        char buf[350];
+        rbase64_encode(buf, (char *)packet.data, packet.len);
+        doc["data"] = buf;
+        sys.tasks.logger.log(doc);
+    }
+}
+
+void RadioTask::logStats(){
+    StaticJsonDocument<1000> doc;
+    doc["id"] = pcTaskGetName(taskHandle);
+    doc["msg"] = "stats";
+    doc["level"] = (uint8_t)stats;
+    doc["tick"] = xTaskGetTickCount();
+    doc["rx_success"] = rx_success_counter;
+    doc["rx_failure"] = rx_failure_counter;
+    doc["tx_success"] = tx_success_counter;
+    doc["tx_failure"] = tx_failure_counter;
+    doc["freq"] = settings.freq;
+    doc["bw"] = settings.bw;
+    doc["sf"] = settings.sf;
+    doc["cr"] = settings.cr;
+    doc["pwr"] = settings.power;
+    sys.tasks.logger.log(doc);
 }

@@ -5,6 +5,7 @@
 #include "ArduinoJson.h"
 #include "MsgBuffer.hpp"
 #include "event_groups.h"
+#include "LoggerTask.hpp"
 
 #define RADIOLIB_STATIC_ONLY
 #include "SX1262S.hpp"
@@ -31,27 +32,46 @@ class RadioTask
 {
 private:
   static const size_t stackSize = 1000;
-
   static TaskHandle_t taskHandle;
   static StaticTask_t xTaskBuffer;
   static StackType_t xStack[stackSize];
 
-  static void activity(void *p);
+  static void activity_wrapper(void *p);
+  void activity();
 
   static void radioISR();
 
-  static void applySettings(radio_settings_t &settings);
+  void applySettings(radio_settings_t &settings);
 
-  static MsgBuffer<packet_t, 1050> txbuf;
-  static MsgBuffer<packet_t, 1050> rxbuf;
+  MsgBuffer<packet_t, 1050> txbuf;
+  MsgBuffer<packet_t, 1050> rxbuf;
 
-  static StaticEventGroup_t evbuf;
-  static EventGroupHandle_t evgroup;
+  StaticEventGroup_t evbuf;
+  EventGroupHandle_t evgroup;
 
-  static Module mod;
-  static SX1262S lora;
+  // SX1262 has the following connections:
+  // NSS pin:   5
+  // DIO1 pin:  6
+  // NRST pin:  10
+  // BUSY pin:  9
+  Module mod = Module(5, 6, 10, 9);
+  SX1262S lora = SX1262S(&mod);
 
-  static MsgBuffer<radio_settings_t, 1000> settingsBuf;
+  MsgBuffer<radio_settings_t, 1000> settingsBuf;
+
+  uint32_t rx_success_counter = 0;
+  uint32_t rx_failure_counter = 0;
+  uint32_t tx_success_counter = 0;
+  uint32_t tx_failure_counter = 0;
+
+  void log(log_type t, const char *msg);
+  void logPacket(const char *msg, packet_t &packet);
+
+  uint8_t log_mask = fatal | error | warning | stats | data | info;
+
+  radio_settings_t settings;
+
+  void logStats();
 
 public:
   RadioTask(uint8_t priority);
