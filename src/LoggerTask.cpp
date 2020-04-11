@@ -79,24 +79,27 @@ void LoggerTask::activity(void *ptr)
     while (true)
     {
         //Step 1: read in all the logs
-        if (logBuffer.receiveTimeout(p, 1000, 500) > 0)
+        if (logBuffer.receiveTimeout(logLineBuffer, 1000, 500) > 0)
         {
-            p = logLineBuffer + strlen(logLineBuffer);
 
-            p[0] = '\n';
-            p++;
-            p[0] = '\0';
+            Serial.println(logLineBuffer);
 
-            if (p - logLineBuffer > 8999 || xTaskGetTickCount() > timeout)
-            { //we need to write!
+            //p = logLineBuffer + strlen(logLineBuffer);
+
+            // p[0] = '\n';
+            // p++;
+            // p[0] = '\0';
+
+            //if (p - logLineBuffer > 8999 || xTaskGetTickCount() > timeout)
+            //{ //we need to write!
                 //Step 2: Write to USB
-                Serial.print(logLineBuffer);
+                //Serial.print(logLineBuffer);
 
                 //reset buffer
-                logLineBuffer[0] = '\0';
-                p = logLineBuffer;
-                timeout = xTaskGetTickCount() + 1000; //if there are no logs for a bit, we should still flush every once and a while
-            }
+            //    logLineBuffer[0] = '\0';
+            //    p = logLineBuffer;
+            //    timeout = xTaskGetTickCount() + 1000; //if there are no logs for a bit, we should still flush every once and a while
+            //}
         }
 
         int count = Serial.available();
