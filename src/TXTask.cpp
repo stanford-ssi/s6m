@@ -32,33 +32,13 @@ void TXTask::activity()
 {
     pinMode(LED_BUILTIN, OUTPUT);
 
-    // uint32_t i = 0;
-    // packet_t packet;
-    // bool led = false;
-    // packet.len = snprintf((char *)packet.data, 255, "B:%lu", i) + 1;
-    // while (true)
-    // {
-    //     if (sys.tasks.radio.sendPacket(packet))
-    //     {
-    //         log(info, "queued");
-    //         i++;
-    //         packet.len = snprintf((char *)packet.data, 255, "B:%lu", i) + 1;
-    //         led = !led;
-    //         digitalWrite(LED_BUILTIN, led);
-    //     }
-    //     else
-    //     {
-    //         vTaskDelay(100);
-    //     }
-    // }
-
-    char str[200];
+    char str[500];
 
     while (true)
     {
-        uint32_t len = sys.tasks.logger.inputBuffer.receive(str, 200, true);
+        uint32_t len = sys.tasks.logger.inputBuffer.receive(str, 500, true);
         str[len] = 0;
-        StaticJsonDocument<200> doc;
+        StaticJsonDocument<500> doc;
         if (deserializeJson(doc, str) == DeserializationError::Ok)
         {
             JsonVariant id = doc["id"];
