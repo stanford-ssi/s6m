@@ -81,14 +81,14 @@ def readSerial():
         if c == b'\n':
             serBuffer += "\n" # add the newline to the buffer
             #add the line to the TOP of the log
-            process(serBuffer)
             log.insert(END, serBuffer)
+            process(serBuffer)
             serBuffer = "" # empty the buffer
         else:
             try:
                 serBuffer += c.decode("utf-8")  # add to the buffer
             except UnicodeDecodeError as a:
-                print("rip")
+                print(c)
 
     root.after(10, readSerial) # check serial again soon
 

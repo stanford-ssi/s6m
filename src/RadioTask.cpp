@@ -150,6 +150,8 @@ void RadioTask::activity()
                 packet_t packet;
                 lora.readData(packet.data, 255);
                 packet.len = lora.getPacketLength();
+                packet.rssi = lora.getRSSI();
+                packet.snr = lora.getSNR();
                 rxbuf.send(packet);
                 logPacket("RX", packet);
                 rx_success_counter++;
@@ -244,6 +246,8 @@ void RadioTask::logPacket(const char *msg, packet_t &packet)
         doc["msg"] = msg;
         doc["level"] = (uint8_t)data;
         doc["tick"] = xTaskGetTickCount();
+        doc["rssi"] = packet.rssi;
+        doc["snr"] = packet.snr;
         doc["len"] = packet.len;
         char buf[350];
         rbase64_encode(buf, (char *)packet.data, packet.len);

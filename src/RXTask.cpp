@@ -34,10 +34,10 @@ void RXTask::activity()
     {
         packet_t packet;
         sys.tasks.radio.waitForPacket(packet);
-        i++;
-        char str[50];
-        snprintf(str, 50, "Got %lu of %s", i, (char *)packet.data);
-        log(info,str);
+        // i++;
+        // char str[50];
+        // snprintf(str, 50, "Got %lu of %s", i, (char *)packet.data);
+        // log(info,str);
     }
 }
 

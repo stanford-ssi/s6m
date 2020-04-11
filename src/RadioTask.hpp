@@ -13,8 +13,10 @@
 
 struct
 {
-  uint8_t len;
+  uint8_t len = 0;
   uint8_t data[255];
+  float rssi = 0.0;
+  float snr = 0.0;
 } typedef packet_t;
 
 struct
