@@ -5,14 +5,14 @@ TaskHandle_t LoggerTask::taskHandle = NULL;
 StaticTask_t LoggerTask::xTaskBuffer;
 StackType_t LoggerTask::xStack[stackSize];
 
-StrBuffer<10000> LoggerTask::strBuffer;
+StrBuffer<10000> LoggerTask::logBuffer;
+StrBuffer<3000> LoggerTask::inputBuffer;
 
-char LoggerTask::lineBuffer[10000];
-char LoggerTask::inputLineBuffer[1000];
+char LoggerTask::logLineBuffer[10000];
+char LoggerTask::inputLineBuffer[3000];
 
 bool LoggerTask::loggingEnabled = false;
 bool LoggerTask::shitlEnabled = false;
-
 
 LoggerTask::LoggerTask(uint8_t priority)
 {
@@ -32,7 +32,7 @@ TaskHandle_t LoggerTask::getTaskHandle()
 
 void LoggerTask::log(const char *message)
 {
-    strBuffer.send(message, strlen(message) + 1);
+    logBuffer.send(message, strlen(message) + 1);
 }
 
 void LoggerTask::logJSON(JsonDocument &jsonDoc, const char *id)
@@ -73,34 +73,47 @@ void LoggerTask::activity(void *ptr)
 
     Serial.begin(9600);
 
-    char *p = lineBuffer;
+    char *p = logLineBuffer;
+    char *q = inputLineBuffer;
     TickType_t timeout = 0;
     while (true)
     {
         //Step 1: read in all the logs
-        if (strBuffer.receive(p, 1000, true) > 0)
+        if (logBuffer.receiveTimeout(p, 1000, 500) > 0)
         {
-            p = lineBuffer + strlen(lineBuffer);
+            p = logLineBuffer + strlen(logLineBuffer);
 
             p[0] = '\n';
             p++;
             p[0] = '\0';
 
-            if (p - lineBuffer > 8999 || xTaskGetTickCount() > timeout)
+            if (p - logLineBuffer > 8999 || xTaskGetTickCount() > timeout)
             { //we need to write!
                 //Step 2: Write to USB
-                writeUSB(lineBuffer);
+                Serial.print(logLineBuffer);
 
                 //reset buffer
-                lineBuffer[0] = '\0';
-                p = lineBuffer;
+                logLineBuffer[0] = '\0';
+                p = logLineBuffer;
                 timeout = xTaskGetTickCount() + 1000; //if there are no logs for a bit, we should still flush every once and a while
             }
         }
-    }
-}
 
-void LoggerTask::writeUSB(char *buf)
-{
-    Serial.print(buf);
+        int count = Serial.available();
+        while (count > 0)
+        {
+            Serial.readBytes(q, count);
+            q += count;
+            if (*(q - 1) == '\n')
+            {
+                if (*(q - 2) == '\r')
+                    q--;
+                q--;
+                *(q) = '\0';
+                inputBuffer.send(inputLineBuffer, strlen(inputLineBuffer));
+                q = inputLineBuffer;
+            }
+            count = Serial.available();
+        }
+    }
 }

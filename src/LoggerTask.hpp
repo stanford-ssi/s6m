@@ -30,11 +30,11 @@ private:
   static StaticTask_t xTaskBuffer;
   static StackType_t xStack[stackSize];
 
-  static StrBuffer<10000> strBuffer;
+  static StrBuffer<10000> logBuffer;
 
-  static char lineBuffer[10000];
 
-  static char inputLineBuffer[1000];
+  static char logLineBuffer[10000];
+  static char inputLineBuffer[3000];
 
   static bool loggingEnabled;
   static bool shitlEnabled;
@@ -45,6 +45,7 @@ private:
   static void format();
 
 public:
+  static StrBuffer<3000> inputBuffer;
   LoggerTask(uint8_t priority);
   TaskHandle_t getTaskHandle();
   void log(const char *message);
