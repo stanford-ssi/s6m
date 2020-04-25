@@ -72,11 +72,24 @@ radio_settings_t RadioTask::getSettings()
 
 void RadioTask::activity()
 {
-    int state = lora.begin(settings.freq, settings.bw, settings.sf, settings.cr, settings.syncword, settings.power, settings.currentLimit, settings.preambleLength, 1.8F, false);
-
-    if (state != ERR_NONE)
+    while (true)
     {
-        sys.tasks.logger.log("Radio Init Failed!");
+        int state = lora.begin(settings.freq, settings.bw, settings.sf, settings.cr, settings.syncword, settings.power, settings.currentLimit, settings.preambleLength, 1.8F, false);
+
+        if (state != ERR_NONE)
+        {
+            StaticJsonDocument<1000> doc;
+            doc["id"] = pcTaskGetName(taskHandle);
+            doc["msg"] = "Init Failed";
+            doc["code"] = state;
+            doc["tick"] = xTaskGetTickCount();
+            sys.tasks.logger.log(doc);
+            vTaskDelay(1000);
+        }
+        else
+        {
+            break;
+        }
     }
 
     lora.setDio1Action(radioISR);
