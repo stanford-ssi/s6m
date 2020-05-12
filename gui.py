@@ -74,7 +74,11 @@ def process(line):
                 data_feilds[key][0].set(str(data[key]) + data_feilds[key][1])
 
         if (data["msg"] == "RX" or data["msg"] == "TX"):
-            msg = base64.b64decode(data["data"]).decode("utf-8")
+            try:
+                msg = base64.b64decode(data["data"]).decode("utf-8")
+            except UnicodeDecodeError as e:
+                msg = "{}"
+            
             msg = data["msg"] + ">> " + msg + "\n"
             console.insert(END, msg)
             console.see(END)

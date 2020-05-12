@@ -160,7 +160,15 @@ void RadioTask::activity()
             if (irq & SX126X_IRQ_RX_DONE) //packet is ready, we can grab it
             {
                 log(info, "RxDone");
+
+                bool valid = true;
+                if ((irq & SX126X_IRQ_CRC_ERR) || (irq & SX126X_IRQ_CRC_ERR)) {
+                    log(warning, "CRC Error");
+                    valid = false;
+                }
+
                 packet_t packet;
+                packet.crc = valid;
                 lora.readData(packet.data, 255);
                 packet.len = lora.getPacketLength();
                 packet.rssi = lora.getRSSI();

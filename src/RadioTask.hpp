@@ -17,16 +17,17 @@ struct
   uint8_t data[255];
   float rssi = 0.0;
   float snr = 0.0;
+  bool crc = false;
 } typedef packet_t;
 
 struct
 {
   float freq = 433.551F;
-  float bw = 125.0F;
-  uint8_t sf = 7;
+  float bw = 10.4F;
+  uint8_t sf = 12;
   uint8_t cr = 8;
   uint8_t syncword = SX126X_SYNC_WORD_PRIVATE;
-  int8_t power = 0;
+  int8_t power = 22;
   float currentLimit = 139.0F;
   uint8_t preambleLength = 8;
   uint8_t log_mask = fatal | error | warning | stats | data | info;
