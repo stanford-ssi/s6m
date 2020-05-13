@@ -3,6 +3,7 @@ from serial import *
 from tkinter import *
 import json
 import base64
+import telem
 
 import tkinter as tk
 
@@ -42,8 +43,8 @@ dataFrame.grid(column=2, row=1, rowspan=2)
 
 Label(dataFrame, text="Data").grid(column=0, columnspan=2)
 
-vars = [["freq", "Frequency:", "MHz"], ["bw", "Bandwidth:", "kHz"],
-        ["sf", "Spreading:", ""], ["pwr", "Power:", "dBm"],
+vars = [["freq", "Frequency", "MHz"], ["bw", "Bandwidth", "kHz"],
+        ["sf", "Spreading", ""], ["pwr", "Power", "dBm"],
         ["cr", "Coding Rate", ""], ["rx_success", "RX Good", ""],
         ["rx_failure", "RX Fail", ""], ["tx_success", "TX Good", ""],
         ["tx_failure", "TX Fail", ""], ["rssi", "Last RSSI:", "dBm"],
@@ -60,6 +61,28 @@ for entry in vars:
         column=1, row=data_row)
     data_row += 1
 
+# radiobuttons
+msgtype = IntVar()
+Radiobutton(dataFrame, text="Base64", variable=msgtype,
+            value=0).grid(column=0, row=data_row)
+data_row += 1
+Radiobutton(dataFrame, text="ThunderGuppy Telem",
+            variable=msgtype, value=1).grid(column=0, row=data_row)
+data_row += 1
+
+# latitude and longitude correction feilds
+pos = (IntVar(), IntVar())
+
+Label(dataFrame, text="Latitude").grid(column=0, row=data_row)
+lat_entry = Entry(dataFrame, textvariable=pos[0])
+lat_entry.grid(column=1, row=data_row)
+data_row += 1
+
+Label(dataFrame, text="Longitude").grid(column=0, row=data_row)
+lon_entry = Entry(dataFrame, textvariable=pos[1])
+lon_entry.grid(column=1, row=data_row)
+data_row += 1
+
 # make our own buffer
 # useful for parsing commands
 # Serial.readline seems unreliable at times too
@@ -74,15 +97,20 @@ def process(line):
                 data_feilds[key][0].set(str(data[key]) + data_feilds[key][1])
 
         if (data["msg"] == "RX" or data["msg"] == "TX"):
-            try:
-                msg = base64.b64decode(data["data"]).decode("utf-8")
-            except UnicodeDecodeError as e:
-                msg = "{}"
-            
-            msg = data["msg"] + ">> " + msg + "\n"
-            console.insert(END, msg)
+            if msgtype.get() == 0:
+                try:
+                    msg = base64.b64decode(data["data"]).decode("utf-8")
+                except UnicodeDecodeError as e:
+                    msg = "<invalid base64>"
+
+                msg = data["msg"] + ">> " + msg + "\n"
+                console.insert(END, msg)
+
+            elif msgtype.get() == 1:
+                msg = telem.decodeTelem(data["data"], pos) + "\n"
+                console.insert(END, msg)
+
             console.see(END)
-            # console.update()
 
 
 def readSerial():
